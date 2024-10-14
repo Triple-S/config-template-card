@@ -42,37 +42,70 @@ export class ConfigTemplateCard extends LitElement {
       throw new Error('No element type defined');
     }
 
-    if (!config.entities) {
-      throw new Error('No entities defined');
-    }
+    //if (!config.entities) {
+    //  throw new Error('No entities defined');
+    //}
 
     this._config = config;
 
     this.loadCardHelpers();
   }
 
-  private getLovelacePanel() {
-    const ha = document.querySelector("home-assistant");
-
-    if (ha && ha.shadowRoot) {
-      const haMain = ha.shadowRoot.querySelector("home-assistant-main");
-
-      if (haMain && haMain.shadowRoot) {
-        return haMain.shadowRoot.querySelector('ha-panel-lovelace');
-      }
+  private getLovelace() {
+    let root: any = document.querySelector('home-assistant');
+    root = root && root.shadowRoot;
+    root = root && root.querySelector('home-assistant-main');
+    root = root && root.shadowRoot;
+    root = root && root.querySelector('ha-drawer partial-panel-resolver');
+    root = root && root.shadowRoot || root;
+    root = root && root.querySelector('ha-panel-lovelace');
+    root = root && root.shadowRoot;
+    root = root && root.querySelector('hui-root');
+    if (root) {
+      const ll = root.lovelace;
+      ll.current_view = root.___curView;
+      return ll;
     }
-
-    return null
   }
 
-  private getLovelaceConfig() {
-    const panel = this.getLovelacePanel() as any;
+  private getLovelacePanelConfig() {
+    const lovelace = this.getLovelace();
 
-    if (panel && panel.lovelace && panel.lovelace.config && panel.lovelace.config.config_template_card_vars) {
-      return panel.lovelace.config.config_template_card_vars
+    if (lovelace && lovelace.config && lovelace.config.config_template_card_vars) {
+      return lovelace.config.config_template_card_vars;
     }
 
-    return {}
+    return {};
+  }
+
+  private getLovelaceViewConfig() {
+    const lovelace = this.getLovelace();
+
+    if (lovelace && lovelace.config && lovelace.current_view && lovelace.config.views[lovelace.current_view] && lovelace.config.views[lovelace.current_view].config_template_card_vars) {
+      return lovelace.config.views[lovelace.current_view].config_template_card_vars;
+    }
+
+    return {};
+  }
+
+  private getLovelacePanelEntities() {
+    const lovelace = this.getLovelace();
+
+    if (lovelace && lovelace.config && lovelace.config.config_template_card_entities) {
+      return lovelace.config.config_template_card_entities;
+    }
+
+    return [];
+  }
+
+  private getLovelaceViewEntities() {
+    const lovelace = this.getLovelace();
+
+    if (lovelace && lovelace.config && lovelace.current_view && lovelace.config.views[lovelace.current_view] && lovelace.config.views[lovelace.current_view].config_template_card_entities) {
+      return lovelace.config.views[lovelace.current_view].config_template_card_entities;
+    }
+
+    return [];
   }
 
   protected shouldUpdate(changedProps: PropertyValues): boolean {
@@ -88,7 +121,11 @@ export class ConfigTemplateCard extends LitElement {
       const oldHass = changedProps.get('hass') as HomeAssistant | undefined;
 
       if (oldHass) {
-        for (const entity of this._config.entities) {
+        const entities: string[] = this._config.entities ? [...this._config.entities] : [];
+        entities.push(...this.getLovelacePanelEntities());
+        entities.push(...this.getLovelaceViewEntities());
+
+        for (const entity of entities) {
           const evaluatedTemplate = this._evaluateTemplate(entity);
           if (Boolean(this.hass && oldHass.states[evaluatedTemplate] !== this.hass.states[evaluatedTemplate])) {
             return true;
@@ -231,13 +268,23 @@ export class ConfigTemplateCard extends LitElement {
       }
     }
 
-    const localVars = this.getLovelaceConfig();
+    const panelVars = this.getLovelacePanelConfig();
 
-    if (localVars) {
-      if (Array.isArray(localVars)) {
-        arrayVars.push(...localVars);
+    if (panelVars) {
+      if (Array.isArray(panelVars)) {
+        arrayVars.push(...panelVars);
       } else {
-        Object.assign(namedVars, localVars);
+        Object.assign(namedVars, panelVars);
+      }
+    }
+
+    const viewVars = this.getLovelaceViewConfig();
+
+    if (viewVars) {
+      if (Array.isArray(viewVars)) {
+        arrayVars.push(...viewVars);
+      } else {
+        Object.assign(namedVars, viewVars);
       }
     }
 
