@@ -44,7 +44,7 @@
     "typescript": "^4.4.3"
   },
   "scripts": {
-    "start": "rollup -c rollup.config.dev.js --watch",
+    "start": "rollup -c --bundleConfigAsCjs rollup.config.dev.js --watch",
     "build": "npm run lint && npm run rollup",
     "lint": "eslint src/*.ts",
     "rollup": "rollup -c --bundleConfigAsCjs"

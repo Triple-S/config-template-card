@@ -260,14 +260,6 @@ export class ConfigTemplateCard extends LitElement {
     const arrayVars: string[] = [];
     let varDef = '';
 
-    if (this._config) {
-      if (Array.isArray(this._config.variables)) {
-        arrayVars.push(...this._config.variables);
-      } else {
-        Object.assign(namedVars, this._config.variables);
-      }
-    }
-
     const panelVars = this.getLovelacePanelConfig();
 
     if (panelVars) {
@@ -285,6 +277,14 @@ export class ConfigTemplateCard extends LitElement {
         arrayVars.push(...viewVars);
       } else {
         Object.assign(namedVars, viewVars);
+      }
+    }
+
+    if (this._config) {
+      if (Array.isArray(this._config.variables)) {
+        arrayVars.push(...this._config.variables);
+      } else {
+        Object.assign(namedVars, this._config.variables);
       }
     }
 
