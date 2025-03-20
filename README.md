@@ -157,7 +157,7 @@ TODO
 ```yaml
 type: custom:config-template-card
 variables:
-  - states['sensor.light']
+  - states['light.kitchen']
 entities:
   - '${vars[0].entity_id}'
 card:
