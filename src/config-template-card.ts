@@ -14,11 +14,12 @@ console.info(
 
 @customElement('config-template-card')
 export class ConfigTemplateCard extends LitElement {
-  @property({ attribute: false }) public hass?: HomeAssistant;
+  @property({ attribute: false }) public _hass?: HomeAssistant;
   @state() private _config?: ConfigTemplateConfig;
   private _curVars?: ConfigTemplateVars;
   @state() private _helpers?: any;
   private _initialized = false;
+  private _element?: any;
 
   public setConfig(config?: ConfigTemplateConfig): void {
     if (!config) {
@@ -121,7 +122,7 @@ export class ConfigTemplateCard extends LitElement {
     }
 
     if (this._config) {
-      const oldHass = changedProps.get('hass') as HomeAssistant | undefined;
+      const oldHass = changedProps.get('_hass') as HomeAssistant | undefined;
 
       if (oldHass) {
         this._evaluateVars();
@@ -144,7 +145,7 @@ export class ConfigTemplateCard extends LitElement {
         }
 
         for (const entity of entities) {
-          if (this.hass && oldHass.states[entity] !== this.hass.states[entity]) {
+          if (this._hass && oldHass.states[entity] !== this._hass.states[entity]) {
             return true;
           }
         }
@@ -173,7 +174,7 @@ export class ConfigTemplateCard extends LitElement {
   protected render(): TemplateResult {
     if (
       !this._config ||
-      !this.hass ||
+      !this._hass ||
       !this._helpers ||
       (!this._config.card && !this._config.row && !this._config.element)
     ) {
@@ -199,12 +200,12 @@ export class ConfigTemplateCard extends LitElement {
     // render() call to re-evaluate variables.
     this._curVars = undefined;
 
-    const element = this._config.card
+    this._element = this._config.card
       ? this._helpers.createCardElement(configSection)
       : this._config.row
         ? this._helpers.createRowElement(configSection)
         : this._helpers.createHuiElement(configSection);
-    element.hass = this.hass;
+    this._element.hass = this._hass;
 
     if (this._config.element) {
       Object.keys(style).forEach((prop) => {
@@ -213,17 +214,23 @@ export class ConfigTemplateCard extends LitElement {
       if (configSection?.style) {
         Object.keys(configSection.style).forEach((prop) => {
           if (configSection.style) {  // TypeScript requires a redundant check here, not sure why
-            element.style.setProperty(prop, configSection.style[prop]);
+            this._element.style.setProperty(prop, configSection.style[prop]);
           }
         });
       }
     }
 
-    return html`<div id="card">${element}</div>`;
+    return html`<div id="card">${this._element}</div>`;
   }
 
+  set hass(hass) {
+    this._hass = hass;
+    if (this._element) this._element.hass = hass;
+  }
+
+
   private _initialize(): void {
-    if (this.hass === undefined) return;
+    if (this._hass === undefined) return;
     if (this._config === undefined) return;
     if (this._helpers === undefined) return;
     this._initialized = true;
@@ -272,7 +279,7 @@ export class ConfigTemplateCard extends LitElement {
     const arrayVars: any[] = [];
 
     const cv = this._curVars = {
-      hass: this.hass, states: this.hass?.states, user: this.hass?.user, vars: vars,
+      hass: this._hass, states: this._hass?.states, user: this._hass?.user, vars: vars,
       _evalInit: '',
     }
     cv._evalInit += "var hass = this._curVars.hass;\n";
@@ -325,13 +332,13 @@ export class ConfigTemplateCard extends LitElement {
   }
 
   private _evalWithVars(template: string): any {
-    // Be aware that `this.hass` must be available to evaluated templates for backward compatibility
+    // Be aware that `this._hass` must be available to evaluated templates for backward compatibility
     // with old config-template-card configs.
 
     const init = (this._curVars?._evalInit ? this._curVars._evalInit : '');
 
     // "direct" eval() is considered insecure and generates warnings, so use "indirect" eval(),
-    // which uses global scope as local scope (this === window, so this.hass should work).
+    // which uses global scope as local scope (this === window, so this._hass should work).
     const tsWindow: any = window;  // Silence typescript errors about setting variables on window
     const origCurVars = tsWindow._curVars;  // Just in case there is a conflicting global variable
     tsWindow._curVars = this._curVars;
