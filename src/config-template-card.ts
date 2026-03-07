@@ -20,35 +20,41 @@ export class ConfigTemplateCard extends LitElement {
   @state() private _helpers?: any;
   private _initialized = false;
   private _element?: any;
+  private _updateTimer?: number;
+
+  private _handleResize = () => {
+    if (this._updateTimer)
+      window.clearTimeout(this._updateTimer);
+
+    this._updateTimer = window.setTimeout(() => { requestAnimationFrame(() => { this.requestUpdate('_resize', true); }); }, 500);
+  }
 
   public setConfig(config?: ConfigTemplateConfig): void {
-    if (!config) {
+    if (!config)
       throw new Error('Invalid configuration');
-    }
 
-    if (!config.card && !config.row && !config.element) {
+    if (!config.card && !config.row && !config.element)
       throw new Error('No card or row or element defined');
-    }
 
-    if (config.card && !config.card.type) {
+    if (config.card && !config.card.type)
       throw new Error('No card type defined');
-    }
 
-    if (config.card && config.card.type === 'picture-elements') {
-      console.warn(
-        'WARNING: config-template-card should not be used with the picture-elements card itself. Instead use it as one of the elements. Check the README for details',
-      );
-    }
+    if (config.card && config.card.type === 'picture-elements')
+      console.warn('WARNING: config-template-card should not be used with the picture-elements card itself. Instead use it as one of the elements. Check the README for details');
 
-    if (config.element && !config.element.type) {
+    if (config.element && !config.element.type)
       throw new Error('No element type defined');
-    }
-
-    if (this.getLovelacePanelEntities().length == 0 && this.getLovelaceViewEntities().length == 0 && !config.entities) {
-      throw new Error('No entities defined');
-    }
 
     this._config = config;
+
+    const entities: string[] = this.getAllEntities();
+    if (entities.length == 0)
+      throw new Error('No entities defined');
+
+    window.removeEventListener('resize', this._handleResize);
+
+    if (entities.includes('resize'))
+        window.addEventListener('resize', this._handleResize);
 
     void this.loadCardHelpers();
   }
@@ -63,7 +69,7 @@ export class ConfigTemplateCard extends LitElement {
           const huiRoot : any = haPanel.shadowRoot.querySelector('hui-root');
           if (huiRoot) {
             const ll = huiRoot.lovelace;
-            ll.current_view = huiRoot.___curView;
+            ll.current_view = huiRoot._curView;
             return ll;
           }
         }
@@ -75,9 +81,8 @@ export class ConfigTemplateCard extends LitElement {
   private getLovelacePanelConfig(): any {
     const lovelace = this.getLovelace();
 
-    if (lovelace?.config?.config_template_card_vars) {
+    if (lovelace?.config?.config_template_card_vars)
       return lovelace.config.config_template_card_vars;
-    }
 
     return {};
   }
@@ -85,9 +90,8 @@ export class ConfigTemplateCard extends LitElement {
   private getLovelaceViewConfig(): any {
     const lovelace = this.getLovelace();
 
-    if (lovelace?.config?.views[lovelace.current_view]?.config_template_card_vars) {
+    if (lovelace?.config?.views[lovelace.current_view]?.config_template_card_vars)
       return lovelace.config.views[lovelace.current_view].config_template_card_vars;
-    }
 
     return {};
   }
@@ -95,9 +99,8 @@ export class ConfigTemplateCard extends LitElement {
   private getLovelacePanelEntities() : any {
     const lovelace = this.getLovelace();
 
-    if (lovelace?.config?.config_template_card_entities) {
+    if (lovelace?.config?.config_template_card_entities)
       return lovelace.config.config_template_card_entities;
-    }
 
     return [];
   }
@@ -105,21 +108,31 @@ export class ConfigTemplateCard extends LitElement {
   private getLovelaceViewEntities() : any {
     const lovelace = this.getLovelace();
 
-    if (lovelace?.current_view && lovelace?.config?.views[lovelace.current_view]?.config_template_card_entities) {
+    if (lovelace?.current_view && lovelace?.config?.views[lovelace.current_view]?.config_template_card_entities)
       return lovelace.config.views[lovelace.current_view].config_template_card_entities;
-    }
 
     return [];
   }
 
-  protected shouldUpdate(changedProps: PropertyValues): boolean {
-    if (!this._initialized) {
-      this._initialize();
+  private getAllEntities() : string[] {
+    const entities: string[] = [];
+
+    for (const curEntities of [this.getLovelacePanelEntities(), this.getLovelaceViewEntities(), this._config?.entities ?? []]) {
+      if (Array.isArray(curEntities)) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+        entities.push(...curEntities);
+      }
     }
 
-    if (changedProps.has('_config')) {
+    return entities;
+  }
+
+  protected shouldUpdate(changedProps: PropertyValues): boolean {
+    if (!this._initialized)
+      this._initialize();
+
+    if (changedProps.has('_config') || changedProps.has('_resize'))
       return true;
-    }
 
     if (this._config) {
       const oldHass = changedProps.get('_hass') as HomeAssistant | undefined;
@@ -127,28 +140,11 @@ export class ConfigTemplateCard extends LitElement {
       if (oldHass) {
         this._evaluateVars();
 
-        const entities: string[] = [];
-        const panelEntities = this._evaluateStructure(structuredClone(this.getLovelacePanelEntities()));
-        if (Array.isArray(panelEntities)) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-          entities.push(...panelEntities);
-        }
-        const viewEntities = this._evaluateStructure(structuredClone(this.getLovelaceViewEntities()));
-        if (Array.isArray(viewEntities)) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-          entities.push(...viewEntities);
-        }
-        const localEntities = this._evaluateStructure(structuredClone(this._config.entities));
-        if (Array.isArray(localEntities)) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-          entities.push(...localEntities);
-        }
-
-        for (const entity of entities) {
-          if (this._hass && oldHass.states[entity] !== this._hass.states[entity]) {
+        const entities: string[] = this._evaluateStructure(structuredClone(this.getAllEntities()));
+        for (const entity of entities)
+          if (this._hass && oldHass.states[entity] !== this._hass.states[entity])
             return true;
-          }
-        }
+
         return false;
       }
     }
