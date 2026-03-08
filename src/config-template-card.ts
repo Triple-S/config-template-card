@@ -47,14 +47,37 @@ export class ConfigTemplateCard extends LitElement {
 
     this._config = config;
 
-    const entities: string[] = this.getAllEntities();
-    if (entities.length == 0)
+    const rawentities: string[] = this.getAllEntities();
+    if (rawentities.length == 0)
       throw new Error('No entities defined');
 
     window.removeEventListener('resize', this._handleResize);
 
-    if (entities.includes('resize'))
+    for (const entity of rawentities) {
+      if (entity === '_resize')
         window.addEventListener('resize', this._handleResize);
+      else if (entity.startsWith('_energy')) {
+        const start = Date.now();
+        const presenceCheck = (resolve) => {
+          if (this._hass?.connection[entity] !== undefined) resolve();
+          else if (Date.now() - start > 5000) resolve();
+          else setTimeout(() => { presenceCheck(resolve) }, 100);
+        };
+        (new Promise<void>(presenceCheck)).then(() => {
+          if (this._hass?.connection[entity].subscribe === undefined) return;
+          this._hass.connection[entity].subscribe((data) => {
+            if (this._hass?.connection[entity]) {
+              this._hass.connection[entity].start = data.start;
+              this._hass.connection[entity].end = data.end;
+              this._curVars = undefined;
+            }
+            this.requestUpdate(entity, true);
+          });
+        }).catch((err : unknown) => {
+          console.error("Error in Promise: ", err);
+        });
+      }
+    }
 
     void this.loadCardHelpers();
   }
@@ -131,18 +154,23 @@ export class ConfigTemplateCard extends LitElement {
     if (!this._initialized)
       this._initialize();
 
-    if (changedProps.has('_config') || changedProps.has('_resize'))
+    if (changedProps.has('_config'))
       return true;
 
     if (this._config) {
+      const rawentities: string[] = this.getAllEntities();
+      for (const entity of rawentities)
+        if (entity.startsWith('_') && changedProps.has(entity))
+          return true;
+
       const oldHass = changedProps.get('_hass') as HomeAssistant | undefined;
 
       if (oldHass) {
         this._evaluateVars();
 
-        const entities: string[] = this._evaluateStructure(structuredClone(this.getAllEntities()));
+        const entities: string[] = this._evaluateStructure(structuredClone(rawentities));
         for (const entity of entities)
-          if (this._hass && oldHass.states[entity] !== this._hass.states[entity])
+          if (this._hass && !entity.startsWith('_') && oldHass.states[entity] !== this._hass.states[entity])
             return true;
 
         return false;
