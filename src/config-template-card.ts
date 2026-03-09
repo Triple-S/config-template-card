@@ -67,8 +67,9 @@ export class ConfigTemplateCard extends LitElement {
           if (this._hass?.connection[entity].subscribe === undefined) return;
           this._hass.connection[entity].subscribe((data) => {
             if (this._hass?.connection[entity]) {
-              this._hass.connection[entity].start = data.start;
-              this._hass.connection[entity].end = data.end;
+              for (const key of ["start", "end", "compare"])
+                if (data[key] !== undefined)
+                  this._hass.connection[entity][key] = data[key];
               this._curVars = undefined;
             }
             this.requestUpdate(entity, true);
@@ -284,6 +285,7 @@ export class ConfigTemplateCard extends LitElement {
   }
 
   private _evaluateTemplate(template: string): any {
+    template = template.trim();
     if (template.startsWith('${') && template.endsWith('}')) {
       // The entire property is a template, return eval's result directly
       // to preserve types other than string (eg. numbers)
