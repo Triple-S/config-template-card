@@ -39,7 +39,7 @@ export class ConfigTemplateCard extends LitElement {
     if (config.card && !config.card.type)
       throw new Error('No card type defined');
 
-    if (config.card && config.card.type === 'picture-elements')
+    if (config.card?.type === 'picture-elements')
       console.warn('WARNING: config-template-card should not be used with the picture-elements card itself. Instead use it as one of the elements. Check the README for details');
 
     if (config.element && !config.element.type)
@@ -361,7 +361,7 @@ export class ConfigTemplateCard extends LitElement {
     // Be aware that `this._hass` must be available to evaluated templates for backward compatibility
     // with old config-template-card configs.
 
-    const init = (this._curVars?._evalInit ? this._curVars._evalInit : '');
+    const init = (this._curVars?._evalInit ?? '');
 
     // "direct" eval() is considered insecure and generates warnings, so use "indirect" eval(),
     // which uses global scope as local scope (this === window, so this._hass should work).
